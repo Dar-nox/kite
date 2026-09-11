@@ -125,8 +125,9 @@ object KiteSize {
     val hairline: Dp = 0.5.dp
     val radioOutline: Dp = 1.5.dp
 
-    /** Bottom tab bar. */
+    /** Bottom tab bar: 18dp icons, 11sp labels, 56dp tall. */
     val tabIcon: Dp = 18.dp
+    val tabBarHeight: Dp = 56.dp
 
     /** Layout option row diagram. */
     val layoutDiagramWidth: Dp = 34.dp

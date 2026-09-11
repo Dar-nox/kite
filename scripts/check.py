@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
-"""Spec-conformance checks for the design system.
+"""Static checks for the kite sources.
 
-The sandbox this project was built in has no JVM, so the Kotlin sources cannot be compiled here.
-These checks cover the failure modes that a compiler would otherwise catch and that are easy to get
-wrong by hand:
+Run before committing:
 
-  1. Every color token named in specs/DESIGN.md exists in the theme with the exact hex.
-  2. Every `KiteSpacing.x` / `KiteSize.x` / `KiteRadius.x` / `colors.x` reference in the codebase
-     resolves to a declared token (undefined-token references are compile errors).
-  3. No hardcoded hex, dp, or sp leaks into :app or :feature code — CLAUDE.md requires tokens only.
-  4. Braces, parentheses, and brackets balance in every Kotlin file.
+    pip install tree-sitter tree-sitter-kotlin   # once, for the syntax pass
+    python3 scripts/check.py
 
-Run:  python3 scripts/check_design_tokens.py
-Exit: 0 when clean, 1 with a list of violations.
+Exit 0 when clean, 1 with a list of violations.
+
+What it covers:
+
+  1. Kotlin syntax, via the tree-sitter Kotlin grammar (skipped with a note if not installed).
+  2. XML resources parse, and every @color/@string/@drawable/@mipmap/@style reference resolves.
+  3. Every colour token in specs/DESIGN.md exists in the theme with the exact hex value.
+  4. Every KiteSpacing/KiteSize/KiteRadius/AppColors reference resolves to a declared token.
+  5. No hardcoded hex, dp, or sp in :app or :feature code — CLAUDE.md requires tokens only.
+  6. Braces, parentheses, and brackets balance in every Kotlin file.
+
+What it does not cover: types, Room query validity, Compose API signatures, or anything else a
+compiler would catch. Those need a JVM and the Android SDK; run `./gradlew build` for them.
 """
 
 from __future__ import annotations
@@ -20,6 +26,7 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parent.parent
 DESIGN = ROOT / "specs" / "DESIGN.md"
@@ -245,19 +252,108 @@ def first_error(node):
     return node if node.has_error else None
 
 
+def check_xml() -> None:
+    """Every XML resource and the manifest must parse, and the manifest must declare what it uses."""
+    global checked
+    for path in sorted(ROOT.rglob("*.xml")):
+        if ".git" in path.parts or ".venv" in path.parts or "build" in path.parts:
+            continue
+        checked += 1
+        try:
+            root = ElementTree.fromstring(read(path))
+        except ElementTree.ParseError as exc:
+            fail(f"{path.relative_to(ROOT)}: XML parse error: {exc}")
+            continue
+
+        # Referenced resources have to exist somewhere, or aapt fails the build.
+        text = read(path)
+        # Resource names may contain dots (Theme.Kite), so the second group has to allow them.
+        for kind, name in set(re.findall(r'@(color|string|drawable|mipmap|style)/([\w.]+)', text)):
+            if not declares_resource(kind, name):
+                fail(f"{path.relative_to(ROOT)}: @{kind}/{name} is referenced but never defined")
+
+
+def declares_resource(kind: str, name: str) -> bool:
+    """True if some res/ file defines @kind/name."""
+    for path in ROOT.rglob("res/**/*.xml"):
+        text = read(path)
+        if kind == "drawable" and path.name == f"{name}.xml":
+            return True
+        if kind == "mipmap" and path.name.startswith(f"{name}."):
+            return True
+        if f'name="{name}"' in text and f"<{kind}" in text:
+            return True
+    return False
+
+
+def parse_catalog() -> tuple[dict[str, set[str]], set[str]]:
+    """(version names, library/plugin accessor paths) from gradle/libs.versions.toml."""
+    versions: set[str] = set()
+    accessors: set[str] = set()
+    section = None
+    for line in read(ROOT / "gradle" / "libs.versions.toml").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#") or not stripped:
+            continue
+        if stripped.startswith("["):
+            section = stripped.strip("[]")
+            continue
+        name = stripped.split("=", 1)[0].strip()
+        if section == "versions":
+            versions.add(name)
+        elif section in ("libraries", "plugins"):
+            prefix = "plugins." if section == "plugins" else ""
+            # Gradle turns '-' and '_' into '.' in the generated accessor.
+            accessors.add(prefix + name.replace("-", ".").replace("_", "."))
+    return versions, accessors
+
+
+def check_version_catalog() -> None:
+    """Every libs.* accessor used in a build script must exist in the catalog."""
+    global checked
+    versions, accessors = parse_catalog()
+    if not accessors:
+        fail("could not parse gradle/libs.versions.toml")
+        return
+
+    for path in sorted(ROOT.rglob("*.gradle.kts")):
+        src = read(path)
+        rel = path.relative_to(ROOT)
+        for used in set(re.findall(r"\blibs\.([\w.]+)", src)):
+            checked += 1
+            if used not in accessors:
+                fail(f"{rel}: libs.{used} is not declared in libs.versions.toml")
+        for ref in set(re.findall(r'version\.ref\s*=\s*"(\w+)"', src)):
+            checked += 1
+            if ref not in versions:
+                fail(f"{rel}: version.ref \"{ref}\" is not in [versions]")
+
+    # Every version.ref inside the catalog itself must resolve too.
+    catalog_text = read(ROOT / "gradle" / "libs.versions.toml")
+    for ref in set(re.findall(r'version\.ref\s*=\s*"([^"]+)"', catalog_text)):
+        checked += 1
+        if ref not in versions:
+            fail(f'libs.versions.toml: version.ref "{ref}" is not in [versions]')
+
+
 def main() -> int:
     check_brackets()
     check_kotlin_syntax()
+    check_xml()
     check_color_tokens()
     check_token_references(parse_token_objects())
     check_no_hardcoded_values()
+    check_version_catalog()
 
     if failures:
         print(f"FAIL — {len(failures)} violation(s) across {checked} checks:\n")
         for line in failures:
             print(f"  - {line}")
         return 1
-    print(f"OK — {checked} checks passed (color tokens, token references, hardcoded values, brackets).")
+    print(
+        f"OK — {checked} checks passed (Kotlin syntax, XML resources, color tokens, "
+        f"token references, hardcoded values, version catalog, brackets)."
+    )
     return 0
 
 

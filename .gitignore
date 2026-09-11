@@ -1,5 +1,6 @@
 # Gradle
 .gradle/
+.venv/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 

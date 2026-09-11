@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Mirrors of two design tokens, needed by the XML window theme that runs before Compose.
+      Kept to the minimum: anything drawn by Compose reads AppColors, not this file.
+      If a value here changes, change it in core/designsystem/ui/theme/Color.kt too.
+    -->
+    <color name="kite_background">#0F0F0F</color>
+</resources>

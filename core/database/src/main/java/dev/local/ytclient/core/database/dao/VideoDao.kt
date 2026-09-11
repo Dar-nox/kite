@@ -33,6 +33,22 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE channelId = :channelId ORDER BY publishedAt DESC")
     fun observeByChannel(channelId: String): Flow<List<VideoEntity>>
 
+    /**
+     * The feed's raw input: every cached upload from a subscribed channel, newest first.
+     *
+     * One join rather than a query per channel, so the feed does not scale its database work with
+     * the size of the subscription list.
+     */
+    @Query(
+        """
+        SELECT v.* FROM videos v
+        JOIN channels c ON c.channelId = v.channelId
+        WHERE c.isSubscribed = 1
+        ORDER BY v.publishedAt DESC
+        """
+    )
+    fun observeSubscribedUploads(): Flow<List<VideoEntity>>
+
     /** Descriptions are fetched lazily on watch, so they are written separately. */
     @Query("UPDATE videos SET description = :description WHERE videoId = :videoId")
     suspend fun setDescription(videoId: String, description: String?)

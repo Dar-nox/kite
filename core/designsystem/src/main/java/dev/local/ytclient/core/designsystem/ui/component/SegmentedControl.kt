@@ -2,7 +2,7 @@ package dev.local.ytclient.core.designsystem.ui.component
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -17,9 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import dev.local.ytclient.core.designsystem.ui.preview.KitePreview
 import dev.local.ytclient.core.designsystem.ui.theme.AppTheme
@@ -79,11 +76,13 @@ fun <T> SegmentedControl(
                     .height(KiteSize.segmentHeight)
                     .clip(PillShape)
                     .background(segmentBackground, PillShape)
-                    .clickable(onClick = { onSelect(option.value) })
-                    .semantics {
-                        role = Role.Tab
-                        this.selected = isSelected
-                    },
+                    // selectable() carries the tab role and the selected state into semantics, so
+                    // the segment is announced correctly without hand-writing either.
+                    .selectable(
+                        selected = isSelected,
+                        role = Role.Tab,
+                        onClick = { onSelect(option.value) },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

@@ -29,6 +29,9 @@ interface WatchStateDao {
     @Query("SELECT * FROM watch_state")
     suspend fun findAll(): List<WatchStateEntity>
 
+    @Query("SELECT * FROM watch_state")
+    fun observeAll(): Flow<List<WatchStateEntity>>
+
     @Query("SELECT videoId FROM watch_state WHERE completed = 1")
     fun observeCompletedIds(): Flow<List<String>>
 

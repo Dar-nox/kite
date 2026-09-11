@@ -80,8 +80,9 @@ fun AppToggle(
                 value = checked,
                 enabled = enabled,
                 role = Role.Switch,
+                // Role.Switch plus the value is what makes TalkBack say "on"/"off"; there is no
+                // valueDescription parameter to set, and no need for one.
                 onValueChange = onCheckedChange,
-                valueDescription = if (checked) "on" else "off",
             ),
         contentAlignment = Alignment.CenterStart,
     ) {
