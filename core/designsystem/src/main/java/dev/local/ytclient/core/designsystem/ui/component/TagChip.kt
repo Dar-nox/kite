@@ -29,7 +29,7 @@ fun TagChip(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
 ) {
-    val colors = AppTheme.colors.tagColors(tag.colorKey)
+    val tagColors = AppTheme.colors.tagColors(tag.colorKey)
     val clickable = if (onClick != null) {
         Modifier.clickable(onClickLabel = "Show $tag", role = Role.Button, onClick = onClick)
     } else {
@@ -39,10 +39,10 @@ fun TagChip(
     Text(
         text = tag.name,
         style = AppTheme.type.micro,
-        color = colors.text,
+        color = tagColors.text,
         modifier = modifier
             .clip(RoundedCornerShape(KiteRadius.badge))
-            .background(colors.surface)
+            .background(tagColors.surface)
             .then(clickable)
             .padding(horizontal = KiteSpacing.space8, vertical = KiteSpacing.space2),
     )

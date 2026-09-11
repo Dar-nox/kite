@@ -96,22 +96,16 @@ fun <T> SegmentedControl(
     }
 }
 
-/** The watch screen's two tabs, kept together because the spec fixes them as a pair. */
-@Immutable
-enum class WatchTab(val label: String) {
-    UpNext("Up next"),
-    Comments("Comments");
-
-    fun toOption(): SegmentOption<WatchTab> = SegmentOption(value = this, label = label)
-}
-
 @Preview
 @Composable
 private fun SegmentedControlPreview() {
     KitePreview {
         SegmentedControl(
-            options = WatchTab.entries.map { it.toOption() },
-            selected = WatchTab.UpNext,
+            options = listOf(
+                SegmentOption(value = "up_next", label = "Up next"),
+                SegmentOption(value = "comments", label = "Comments"),
+            ),
+            selected = "up_next",
             onSelect = {},
         )
     }
