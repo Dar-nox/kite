@@ -10,14 +10,14 @@ import androidx.room.PrimaryKey
  * Room schema, following `DATA_MODEL.md`. Timestamps are epoch millis; durations and positions are
  * seconds.
  *
- * One deliberate departure from the spec, and the reason matters: the doc annotates user-data
- * columns such as `saved_items.videoId` as `FK → videos`, but it also requires that cached rows can
- * be wiped and re-fetched "without losing anything the user created". A real foreign key with
- * cascade would delete the user's saves the moment the cache is cleared, and one without cascade
- * would make a cache clear fail on a constraint. So cache tables (`videos`, `channels`,
- * `playlists`, `playlist_items`) are joined by plain indexed columns, with the repository upserting
- * a minimal video row whenever it saves something. User-data-to-user-data keys (`saved_item_tags`)
- * do carry real cascading foreign keys, since both sides are exported and neither is ever pruned.
+ * Referential integrity rule, agreed with the spec rather than worked around in code: cache tables
+ * (`videos`, `channels`, `playlists`, `playlist_items`) are joined by indexed columns, not by
+ * database-level foreign keys. A cascading key onto a cache table would delete the user's saves the
+ * moment the cache is cleared, and a non-cascading one would make the clear fail on a constraint —
+ * and the spec requires that cached rows be wipeable without losing anything the user created.
+ * User-data-to-user-data keys (`saved_item_tags`) do carry real cascading foreign keys, since both
+ * sides are exported and neither is ever pruned. The repository upserts a minimal video row when it
+ * saves something, so a save always has metadata behind it.
  */
 
 /** Cached video metadata. Re-fetchable, never user-created. */
@@ -45,6 +45,15 @@ data class VideoEntity(
     val isVertical: Boolean = false,
     /** Fetched lazily on watch; null until then. */
     val description: String? = null,
+    /**
+     * YouTube's numeric category id, as returned by `videos.list`. Stored raw; display names come
+     * from a lookup in the data layer so a change of wording is not a schema change.
+     *
+     * Present from schema version 1 on purpose: the feed's category chips need it, and adding a
+     * column while the database is empty costs nothing, where adding it after the first sync costs a
+     * migration and a migration test.
+     */
+    val categoryId: String? = null,
     val cachedAt: Long,
 )
 
@@ -75,7 +84,12 @@ data class ChannelEntity(
 @Entity(
     tableName = "saved_items",
     indices = [
-        Index(value = ["videoId", "collection"], unique = true),
+        // Unique on videoId alone, not (videoId, collection): `FEATURES.md` says a video lives in
+        // exactly one collection at a time, and a composite index would allow the same video in two
+        // of them. Enforcing the invariant here is free while the schema is unshipped; afterwards it
+        // is a data-cleanup migration. Moving between collections is a delete-plus-insert in one
+        // transaction (see SavedItemDao.moveTo), so the constraint never blocks a legitimate move.
+        Index(value = ["videoId"], unique = true),
         Index(value = ["collection", "sortOrder"]),
         Index(value = ["collection", "addedAt"]),
     ],

@@ -336,6 +336,94 @@ def check_version_catalog() -> None:
             fail(f'libs.versions.toml: version.ref "{ref}" is not in [versions]')
 
 
+# Maps a DATA_MODEL.md table name to the Kotlin entity that implements it.
+ENTITY_BY_TABLE = {
+    "videos": "VideoEntity",
+    "channels": "ChannelEntity",
+    "saved_items": "SavedItemEntity",
+    "watch_state": "WatchStateEntity",
+    "notes": "NoteEntity",
+    "playlists": "PlaylistEntity",
+    "playlist_items": "PlaylistItemEntity",
+    "keyword_filters": "KeywordFilterEntity",
+    "hidden_videos": "HiddenVideoEntity",
+}
+
+
+def parse_data_model_tables() -> dict[str, set[str]]:
+    """table name -> column names, from the entity tables in DATA_MODEL.md."""
+    text = read(ROOT / "specs" / "DATA_MODEL.md")
+    tables: dict[str, set[str]] = {}
+    current: str | None = None
+    for line in text.splitlines():
+        heading = re.match(r"^###\s+`(\w+)`", line)
+        if heading:
+            current = heading.group(1)
+            tables.setdefault(current, set())
+            continue
+        if line.startswith("## "):
+            current = None
+            continue
+        if current is None:
+            continue
+        cell = re.match(r"^\|\s*`(\w+)`\s*\|", line)
+        if cell and cell.group(1) not in ("Column",):
+            tables[current].add(cell.group(1))
+    return {name: cols for name, cols in tables.items() if cols}
+
+
+def entity_properties(class_name: str) -> set[str]:
+    """Constructor property names of a Room entity data class."""
+    text = read(ROOT / "core/database/src/main/java/dev/local/ytclient/core/database/model/Entities.kt")
+    body = text.split(f"data class {class_name}(", 1)
+    if len(body) < 2:
+        return set()
+    props = set()
+    depth = 1
+    for line in body[1].splitlines():
+        depth += line.count("(") - line.count(")")
+        # Annotations may carry arguments: @PrimaryKey(autoGenerate = true) val id.
+        props.update(re.findall(r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*val (\w+)", line))
+        if depth <= 0:
+            break
+    return props
+
+
+def check_data_model() -> None:
+    """Every column in DATA_MODEL.md exists on the entity that implements its table."""
+    global checked
+    for table, columns in parse_data_model_tables().items():
+        entity = ENTITY_BY_TABLE.get(table)
+        if entity is None:
+            continue
+        props = entity_properties(entity)
+        if not props:
+            fail(f"DATA_MODEL.md: table `{table}` has no matching entity {entity} in Entities.kt")
+            continue
+        for column in sorted(columns):
+            checked += 1
+            if column not in props:
+                fail(f"{entity}: DATA_MODEL.md column `{table}.{column}` is missing")
+
+
+def check_settings_keys() -> None:
+    """Every DataStore key in DATA_MODEL.md is actually read/written by SettingsRepositoryImpl."""
+    global checked
+    text = read(ROOT / "specs" / "DATA_MODEL.md")
+    block = text.split("## Settings (DataStore, not Room)", 1)[1].split("```", 2)[1]
+    impl = read(
+        ROOT
+        / "core/datastore/src/main/java/dev/local/ytclient/core/datastore/SettingsRepositoryImpl.kt"
+    )
+    for line in block.splitlines():
+        key = line.strip().split(" ")[0].strip()
+        if not key or "." not in key:
+            continue
+        checked += 1
+        if f'"{key}"' not in impl:
+            fail(f'SettingsRepositoryImpl: DATA_MODEL.md key "{key}" is never used')
+
+
 def main() -> int:
     check_brackets()
     check_kotlin_syntax()
@@ -344,6 +432,8 @@ def main() -> int:
     check_token_references(parse_token_objects())
     check_no_hardcoded_values()
     check_version_catalog()
+    check_data_model()
+    check_settings_keys()
 
     if failures:
         print(f"FAIL — {len(failures)} violation(s) across {checked} checks:\n")
@@ -352,7 +442,7 @@ def main() -> int:
         return 1
     print(
         f"OK — {checked} checks passed (Kotlin syntax, XML resources, color tokens, "
-        f"token references, hardcoded values, version catalog, brackets)."
+        f"data model, settings keys, token references, hardcoded values, version catalog)."
     )
     return 0
 

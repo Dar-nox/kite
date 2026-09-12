@@ -13,9 +13,9 @@ import androidx.compose.ui.unit.sp
  * Heavier weights are banned by the spec because they read as shouting on dark backgrounds, so
  * there is no bold token here and feature code has nothing to reach for. Nothing below 11sp.
  *
- * Line height: 1.35 on the title tokens, 1.45 on the body-side tokens (body, label, meta, micro).
- * DESIGN.md splits the scale that way without naming every token, so the split is stated here once
- * rather than guessed per call site.
+ * Line height: 1.35 on the title tokens (`screenTitle`, `sectionTitle`, `cardTitleLarge`,
+ * `cardTitle`), 1.45 on the body-side tokens (`body`, `label`, `meta`, `micro`) — the split
+ * `DESIGN.md` specifies by name.
  */
 @Immutable
 data class KiteType(

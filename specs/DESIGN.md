@@ -86,7 +86,9 @@ System font (Roboto). Two weights only: **400 regular** and **500 medium**. Neve
 | `meta` | 12sp | 400 | channel, views, dates, durations |
 | `micro` | 11sp | 400 | chips, badges, helper text |
 
-Line height 1.35 for titles, 1.45 for body. Never below 11sp anywhere.
+Line height 1.35 for the title tokens (`screenTitle`, `sectionTitle`, `cardTitleLarge`,
+`cardTitle`), 1.45 for the body-side tokens (`body`, `label`, `meta`, `micro`). Never below 11sp
+anywhere.
 
 **Sentence case everywhere.** No Title Case, no ALL CAPS, including section labels.
 

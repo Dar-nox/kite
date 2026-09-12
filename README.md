@@ -66,19 +66,25 @@ does and does not cover.
 
 Features depend on `:core:*` and never on each other.
 
-## Notes on the specs
+## Spec amendments
 
-Deviations and gaps found while implementing, all flagged rather than guessed at:
+Five problems found while implementing. All are now fixed in `specs/` itself rather than left as
+code-only deviations, so the next phase builds against one contract:
 
-- **No database-level foreign keys onto cache tables.** `DATA_MODEL.md` annotates
-  `saved_items.videoId` as `FK → videos`, but also requires that cached rows be wipeable without
-  losing user data. A cascading key would delete saves on a cache clear; a non-cascading one would
-  make the clear fail. Cache tables are joined by indexed columns instead, and `clearCache()` keeps
-  every row user data still points at. User-data-to-user-data keys (`saved_item_tags`) do cascade.
-- **`hidden_videos` table added.** Swipe-left-to-hide and "not interested" need somewhere to live;
-  the data model didn't define one.
-- **Settings additions.** `watch.showGestureGuides` (guides show on first launch only),
-  `feed.filters` (chips persist across sessions), and `player.seekIntervalSec` (the spec makes the
-  seek interval configurable but lists no key).
-- **Feed category chips deferred.** They need a category column on `videos` that `DATA_MODEL.md`
-  doesn't have. Adding one is a migration, so it waits until the API client exists.
+- **No database-level foreign keys onto cache tables.** `DATA_MODEL.md` annotated
+  `saved_items.videoId` as `FK → videos` while also requiring that cached rows be wipeable without
+  losing user data — a cascading key deletes the saves, a non-cascading one makes the clear fail.
+  The design-rules section now states the rule, and the entity tables say "indexed reference".
+- **`hidden_videos` table.** Swipe-left-to-hide and "not interested" had nowhere to live; a column on
+  `videos` would be lost or resurrected by a cache refresh.
+- **Three settings keys the features need** had no entry: `feed.filters`, `player.seekIntervalSec`,
+  `watch.showGestureGuides`. Added to the settings list.
+- **`videos.categoryId`.** The feed's category chips need it and the table didn't have it. Added
+  while the schema is version 1 with no rows — after the first sync it would cost a migration and a
+  migration test. The chips themselves still land in phase 4.
+- **`saved_items` unique index** was on (`videoId`, `collection`), which permits a video in two
+  collections; `FEATURES.md` says one at a time. Now unique on `videoId` alone, so the database
+  enforces the invariant instead of the DAO hoping to.
+
+Also clarified in `DESIGN.md`: which type tokens take 1.35 line height and which take 1.45.
+
