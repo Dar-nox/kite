@@ -31,7 +31,7 @@ kotlin {
 dependencies {
     api(project(":core:database"))
     api(project(":core:datastore"))
-    implementation(project(":core:network"))
+    api(project(":core:network"))
 
     implementation(libs.core.ktx)
 

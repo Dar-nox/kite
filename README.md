@@ -5,22 +5,35 @@ Built from the specs in [`specs/`](specs) — read [`specs/CLAUDE.md`](specs/CLA
 
 ## Status
 
-Phase 0 of [`specs/ROADMAP.md`](specs/ROADMAP.md) is in: the module graph, the full theme and token
-set, every shared component, the complete Room schema, settings, and an app that launches to a real
-(empty) feed.
+Phases 0 and 1 of [`specs/ROADMAP.md`](specs/ROADMAP.md) are in: the module graph, the full theme and
+token set, every shared component, the complete Room schema, settings, the Data API client, and a
+feed that syncs real uploads and survives being offline.
 
 | Built | Not yet |
 |---|---|
-| Gradle multi-module scaffold, Hilt wiring | Data API client, OAuth, sync workers (phase 1) |
-| Design system: every token from `DESIGN.md` | Playback, `StreamResolver`, Media3 (phase 2) |
-| All Phase 0 components, one dark preview each | Saving, library, notes (phase 3) |
-| Room schema + DAOs for all of `DATA_MODEL.md` | Channel blocking UI, keyword filters, Shorts tab (phase 4) |
-| Settings DataStore, every key | Playlists, folders, progressive loading (phase 5) |
-| Query-time filter pipeline | Remaining feed layouts, mini-player, SponsorBlock (phase 6) |
-| Feed: data layer → ViewModel → screen | Widget, share target, import/export (phase 7) |
+| Gradle multi-module scaffold, Hilt wiring | Playback, `StreamResolver`, Media3 (phase 2) |
+| Design system: every token from `DESIGN.md` | Saving, library, notes (phase 3) |
+| All Phase 0 components, one dark preview each | Channel blocking UI, keyword filters, Shorts tab (phase 4) |
+| Room schema + DAOs for all of `DATA_MODEL.md` | Playlists, folders, progressive loading (phase 5) |
+| Settings DataStore, every key | Remaining feed layouts, mini-player, SponsorBlock (phase 6) |
+| Query-time filter pipeline | Widget, share target, import/export (phase 7) |
+| Feed: data layer → ViewModel → screen | |
+| Data API client, uploads sync, workers | |
 
-The destinations that have no feature yet render a `PendingScreen` saying which phase they land in,
-rather than an empty list that looks broken.
+### Two known gaps in phase 1
+
+**No Google sign-in.** `ARCHITECTURE.md` calls for OAuth to read the account's own subscriptions.
+What is built instead is the seam for it — `AccountAuthenticator`, bound to
+`KeyOnlyAccountAuthenticator` — plus subscribing by pasted URL, handle, or channel id, which works on
+the API key alone and populates the same feed. Swapping in real sign-in is a DI binding, an OAuth
+client id, and a credential-manager dependency; nothing in the repositories changes. I did not ship a
+Sign-In integration I could not run once, because a wrong scope or client type fails in a way that is
+miserable to diagnose from the outside.
+
+**Shorts detection is incomplete.** The Data API exposes no `/shorts/` path and no true aspect ratio,
+and duration alone is ruled out by `FEATURES.md`. So metadata sync leaves `isShort` false and the
+stream resolver in phase 2 writes it back from the watch page. Containment is exact for anything the
+extractor has seen and approximate before that.
 
 ## Building
 
@@ -36,8 +49,9 @@ access to Gradle's distribution servers. Either let Android Studio generate the 
 `gradle wrapper --gradle-version 8.14.3` once locally. The pinned versions in
 `gradle/wrapper/gradle-wrapper.properties` and `gradle/libs.versions.toml` are otherwise complete.
 
-The YouTube Data API key is not in source control. It arrives with the network module in phase 1 and
-will be read from an untracked `secrets.properties`.
+The YouTube Data API key is read at build time from an untracked `secrets.properties` at the repo
+root — copy `secrets.properties.example` and fill in `YOUTUBE_API_KEY`. A build without one compiles
+and runs; API calls fail as `ApiFailure.MissingKey` and the app serves cached data.
 
 ## Checks
 

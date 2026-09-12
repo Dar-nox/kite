@@ -6,6 +6,7 @@ import dev.local.ytclient.core.data.filter.KeywordRule
 import dev.local.ytclient.core.data.model.FeedChip
 import dev.local.ytclient.core.data.model.FeedContent
 import dev.local.ytclient.core.data.model.FeedItem
+import dev.local.ytclient.core.data.model.SyncResult
 import dev.local.ytclient.core.database.dao.ChannelDao
 import dev.local.ytclient.core.database.dao.HiddenVideoDao
 import dev.local.ytclient.core.database.dao.KeywordFilterDao
@@ -42,7 +43,10 @@ class FeedRepositoryImpl @Inject constructor(
     private val keywordFilterDao: KeywordFilterDao,
     private val settingsRepository: SettingsRepository,
     private val filterPipeline: FilterPipeline,
+    private val syncRepository: SyncRepository,
 ) : FeedRepository {
+
+    override suspend fun refresh(): SyncResult = syncRepository.refreshFeed()
 
     /** The five inputs the feed is derived from, captured together so they cannot tear. */
     private data class Input(

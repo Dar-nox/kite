@@ -21,6 +21,38 @@ interface VideoDao {
     @Upsert
     suspend fun upsertAll(videos: List<VideoEntity>)
 
+    /**
+     * Writes only the columns a sync owns, on conflict.
+     *
+     * `isShort` is absent from the update list on purpose: the Data API cannot detect Shorts, the
+     * stream resolver sets it from the watch page, and a nightly refresh that reset it to false
+     * would quietly leak Shorts back into the feed. `description` uses COALESCE so a lazily fetched
+     * description survives a metadata refresh that did not ask for one.
+     */
+    @Query(
+        """
+        INSERT INTO videos (
+            videoId, title, channelId, durationSec, publishedAt, thumbnailUrl,
+            viewCount, isVertical, description, categoryId, cachedAt
+        )
+        VALUES (
+            :videoId, :title, :channelId, :durationSec, :publishedAt, :thumbnailUrl,
+            :viewCount, :isVertical, :description, :categoryId, :cachedAt
+        )
+        ON CONFLICT(videoId) DO UPDATE SET
+            title = excluded.title,
+            channelId = excluded.channelId,
+            durationSec = excluded.durationSec,
+            publishedAt = excluded.publishedAt,
+            thumbnailUrl = excluded.thumbnailUrl,
+            viewCount = excluded.viewCount,
+            description = COALESCE(excluded.description, videos.description),
+            categoryId = excluded.categoryId,
+            cachedAt = excluded.cachedAt
+        """
+    )
+    suspend fun syncMetadata(video: VideoEntity)
+
     @Query("SELECT * FROM videos WHERE videoId = :videoId")
     fun observe(videoId: String): Flow<VideoEntity?>
 
@@ -55,6 +87,10 @@ interface VideoDao {
 
     @Query("SELECT COUNT(*) FROM videos")
     suspend fun count(): Int
+
+    /** Which of [videoIds] are already cached, so a sync can report how many rows were new. */
+    @Query("SELECT videoId FROM videos WHERE videoId IN (:videoIds)")
+    suspend fun existingIds(videoIds: List<String>): List<String>
 
     /**
      * Wipes cached metadata while keeping every row the user's data still points at.

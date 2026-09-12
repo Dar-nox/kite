@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Metadata and stream resolution. Nothing else leaves the device: no analytics SDK, no crash
          reporter, no telemetry of any kind, per CLAUDE.md. -->
@@ -31,6 +32,31 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          WorkManager is configured in KiteApplication so the Hilt worker factory is used. This
+          removes the default initialiser; leaving both in place means the injected factory is
+          ignored and every @HiltWorker fails to construct.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
+
+        <!-- Background playback service. Declared here, implemented in :core:player. -->
+        <service
+            android:name="dev.local.ytclient.core.player.PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

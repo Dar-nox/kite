@@ -2,6 +2,7 @@ package dev.local.ytclient.core.data.repository
 
 import dev.local.ytclient.core.data.model.FeedChip
 import dev.local.ytclient.core.data.model.FeedContent
+import dev.local.ytclient.core.data.model.SyncResult
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -24,6 +25,12 @@ interface FeedRepository {
         activeChips: Set<FeedChip>,
         revealHidden: Boolean = false,
     ): Flow<FeedContent>
+
+    /**
+     * Pull-to-refresh. Cached rows are already on screen when this runs; whatever it fetches lands
+     * in Room and reaches the UI through the same `Flow`, so there is no separate update path.
+     */
+    suspend fun refresh(): SyncResult
 
     /** Swipe left on a card. Local only and reversible from settings. */
     suspend fun hideVideo(videoId: String)

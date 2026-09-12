@@ -16,6 +16,32 @@ interface ChannelDao {
     @Upsert
     suspend fun upsertAll(channels: List<ChannelEntity>)
 
+    /**
+     * Writes only the columns a sync owns.
+     *
+     * A plain upsert would reset `isBlocked`, `defaultSpeed`, `autoSaveTarget`, and `autoSaveTags`
+     * to their defaults every time the channel was refreshed — silently unblocking a channel the
+     * user blocked is exactly the kind of failure that reads as the app ignoring them.
+     */
+    @Query(
+        """
+        INSERT INTO channels (channelId, title, avatarUrl, uploadsPlaylistId, subscriberCount)
+        VALUES (:channelId, :title, :avatarUrl, :uploadsPlaylistId, :subscriberCount)
+        ON CONFLICT(channelId) DO UPDATE SET
+            title = excluded.title,
+            avatarUrl = excluded.avatarUrl,
+            uploadsPlaylistId = excluded.uploadsPlaylistId,
+            subscriberCount = excluded.subscriberCount
+        """
+    )
+    suspend fun syncMetadata(
+        channelId: String,
+        title: String,
+        avatarUrl: String?,
+        uploadsPlaylistId: String?,
+        subscriberCount: Long?,
+    )
+
     @Query("SELECT * FROM channels WHERE channelId = :channelId")
     fun observe(channelId: String): Flow<ChannelEntity?>
 
@@ -24,6 +50,10 @@ interface ChannelDao {
 
     @Query("SELECT * FROM channels WHERE isSubscribed = 1 ORDER BY title COLLATE NOCASE")
     fun observeSubscribed(): Flow<List<ChannelEntity>>
+
+    /** One-shot read for sync workers, which want the list now rather than a stream. */
+    @Query("SELECT * FROM channels WHERE isSubscribed = 1")
+    suspend fun findSubscribed(): List<ChannelEntity>
 
     @Query("SELECT * FROM channels WHERE isBlocked = 1 ORDER BY title COLLATE NOCASE")
     fun observeBlocked(): Flow<List<ChannelEntity>>
